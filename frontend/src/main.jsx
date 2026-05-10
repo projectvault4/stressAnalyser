@@ -1,122 +1,96 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://stress-detector-api-yhx4.onrender.com";
 
-// Whack-a-Mole Style Stress Buster Game
+const wheelActivities = [
+  { title: "Badminton", lines: ["Play", "Badminton"], color: "#ffdc37" },
+  { title: "Dance Break", lines: ["Dance", "Break"], color: "#74d8ff" },
+  { title: "Doodle Art", lines: ["Doodle", "Art"], color: "#ff8fb3" },
+  { title: "Call Friend", lines: ["Call a", "Friend"], color: "#7fd45d" },
+  { title: "Campus Walk", lines: ["Campus", "Walk"], color: "#fff8e6" },
+  { title: "Sing Along", lines: ["Sing", "Along"], color: "#ffdc37" },
+  { title: "Board Game", lines: ["Board", "Game"], color: "#74d8ff" },
+  { title: "Make Chai", lines: ["Make", "Chai"], color: "#ff8fb3" },
+  { title: "Yoga Stretch", lines: ["Yoga", "Stretch"], color: "#7fd45d" },
+  { title: "Photo Walk", lines: ["Photo", "Walk"], color: "#fff8e6" }
+];
+
+function polarToCartesian(cx, cy, radius, angle) {
+  const radians = (angle - 90) * Math.PI / 180;
+  return {
+    x: cx + radius * Math.cos(radians),
+    y: cy + radius * Math.sin(radians)
+  };
+}
+
+function describeSlice(cx, cy, radius, startAngle, endAngle) {
+  const start = polarToCartesian(cx, cy, radius, endAngle);
+  const end = polarToCartesian(cx, cy, radius, startAngle);
+  const largeArcFlag = endAngle - startAngle <= 180 ? 0 : 1;
+
+  return [
+    `M ${cx} ${cy}`,
+    `L ${start.x} ${start.y}`,
+    `A ${radius} ${radius} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`,
+    "Z"
+  ].join(" ");
+}
+
 function StressBusterGame() {
-  const [score, setScore] = useState(0);
-  const [gameActive, setGameActive] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(30);
-  const [targets, setTargets] = useState([]);
-  const [gameOver, setGameOver] = useState(false);
+  const [rotation, setRotation] = useState(0);
+  const [selectedActivity, setSelectedActivity] = useState("Spin for a mood-brightening activity");
+  const [spinning, setSpinning] = useState(false);
 
-  const emojis = ["😤", "😰", "😩", "🤯", "😡", "🧠"];
+  const spinWheel = () => {
+    if (spinning) return;
 
-  // Game timer
-  React.useEffect(() => {
-    if (!gameActive || gameOver) return;
-    
-    const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          setGameActive(false);
-          setGameOver(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    const pickedIndex = Math.floor(Math.random() * wheelActivities.length);
+    const segmentAngle = 360 / wheelActivities.length;
+    const targetAngle = 360 - (pickedIndex * segmentAngle + segmentAngle / 2);
+    const nextRotation = rotation + 1440 + targetAngle;
 
-    return () => clearInterval(timer);
-  }, [gameActive, gameOver]);
-
-  // Spawn targets
-  React.useEffect(() => {
-    if (!gameActive || gameOver) return;
-
-    const spawn = setInterval(() => {
-      const newTarget = {
-        id: Math.random(),
-        emoji: emojis[Math.floor(Math.random() * emojis.length)],
-        top: Math.random() * 80,
-        left: Math.random() * 90
-      };
-      setTargets(prev => [...prev, newTarget]);
-    }, 600);
-
-    return () => clearInterval(spawn);
-  }, [gameActive, gameOver]);
-
-  const startGame = () => {
-    setGameActive(true);
-    setGameOver(false);
-    setScore(0);
-    setTimeLeft(30);
-    setTargets([]);
-  };
-
-  const hitTarget = (id) => {
-    setTargets(prev => prev.filter(t => t.id !== id));
-    setScore(prev => prev + 10);
-  };
-
-  const resetGame = () => {
-    setScore(0);
-    setTimeLeft(30);
-    setGameActive(false);
-    setGameOver(false);
-    setTargets([]);
+    setSpinning(true);
+    setRotation(nextRotation);
+    window.setTimeout(() => {
+      setSelectedActivity(wheelActivities[pickedIndex].title);
+      setSpinning(false);
+    }, 1800);
   };
 
   return (
     <div className="stress-game">
-      <h3>🎯 Stress Buster! Click away your worries!</h3>
-      <div className="game-header">
-        <div className="game-score">Score: {score}</div>
-        <div className="game-timer">Time: {timeLeft}s</div>
-      </div>
-
-      {!gameActive && !gameOver && (
-        <button className="start-game-btn" onClick={startGame}>
-          🎮 START GAME
-        </button>
-      )}
-
-      {gameActive && (
-        <div className="game-board-mole">
-          {targets.map(target => (
-            <div
-              key={target.id}
-              className="mole-target"
-              style={{ top: `${target.top}%`, left: `${target.left}%` }}
-              onClick={() => hitTarget(target.id)}
-            >
-              {target.emoji}
-            </div>
+      <h3>Activity Spin Wheel</h3>
+      <div className="wheel-wrap">
+        <div className="wheel-pointer" />
+        <svg className="activity-wheel" viewBox="0 0 320 320" aria-label="Spinning activity wheel">
+          <g style={{ transform: `rotate(${rotation}deg)`, transformOrigin: "160px 160px" }}>
+          {wheelActivities.map((activity, index) => (
+            <g key={activity.title}>
+              <path
+                d={describeSlice(160, 160, 150, index * 36, (index + 1) * 36)}
+                fill={activity.color}
+              />
+              <text
+                className="wheel-svg-label"
+                x={polarToCartesian(160, 160, 96, index * 36 + 18).x}
+                y={polarToCartesian(160, 160, 96, index * 36 + 18).y}
+              >
+                <tspan x={polarToCartesian(160, 160, 96, index * 36 + 18).x} dy="-5">{activity.lines[0]}</tspan>
+                <tspan x={polarToCartesian(160, 160, 96, index * 36 + 18).x} dy="15">{activity.lines[1]}</tspan>
+              </text>
+            </g>
           ))}
-          <div className="game-instructions">Click on the stress emojis!</div>
-        </div>
-      )}
-
-      {gameOver && (
-        <div className="game-over-screen">
-          <h4>🎉 Game Over!</h4>
-          <p className="final-score">Final Score: {score}</p>
-          <p className="game-message">
-            {score > 150 ? "🔥 Stress destroyer! You're amazing!" : 
-             score > 100 ? "💪 Great job busting that stress!" :
-             "👍 Nice effort! Try again for a better score!"}
-          </p>
-          <button className="reset-game-btn" onClick={startGame}>
-            Play Again
-          </button>
-          <button className="reset-game-btn secondary" onClick={resetGame}>
-            Close Game
-          </button>
-        </div>
-      )}
+          </g>
+          <circle className="wheel-inner-guide" cx="160" cy="160" r="90" />
+          <circle className="wheel-hub" cx="160" cy="160" r="44" />
+        </svg>
+        <button className="wheel-center" onClick={spinWheel} disabled={spinning} type="button">
+          {spinning ? "..." : "SPIN"}
+        </button>
+      </div>
+      <p className="wheel-result">{selectedActivity}</p>
     </div>
   );
 }
@@ -220,9 +194,7 @@ function App() {
     <main className="app-shell">
       <section className="workspace">
         <div className="intro">
-          <p className="eyebrow">Riso check-in</p>
           <h1>Student Stress Detector</h1>
-          <p>Bright, punchy student wellness signals with a print-studio pulse.</p>
           <div className="poster-strip" aria-hidden="true">
             <span>Sleep</span>
             <span>Study</span>
@@ -275,10 +247,13 @@ function App() {
             <div className="score-row">
               <div>
                 <h2>{result.stress_label}</h2>
-                <p>{result.confidence}% confidence</p>
+                <p>{result.confidence}% model confidence</p>
               </div>
               <div className="score-ring" style={{ "--score": `${result.stress_pct}%` }}>
-                <span>{result.stress_pct}%</span>
+                <span>
+                  {result.stress_pct}%
+                  <small>Stress</small>
+                </span>
               </div>
             </div>
 

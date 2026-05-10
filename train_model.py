@@ -201,6 +201,32 @@ class StressPredictor:
         def scale(v, lo, hi, out_lo=0, out_hi=5):
             return round(out_lo + (v - lo) / max(hi - lo, 1) * (out_hi - out_lo), 2)
 
+        def clamp(v, lo=0, hi=100):
+            return min(hi, max(lo, v))
+
+        def severity_score(s):
+            signals = [
+                clamp((8 - s.get("sleep_hours", 7)) / 6 * 100),
+                clamp((s.get("screen_hours", 5) / 12) * 100),
+                clamp((s.get("exercise", 2) - 1) / 3 * 100),
+                clamp((s.get("weight_change", 0) / 3) * 100),
+                clamp((10 - s.get("cgpa", 7.5)) / 10 * 100),
+                clamp((s.get("study_load", 3) - 1) / 4 * 100),
+                clamp((s.get("attendance", 2) - 1) / 3 * 100),
+                clamp((s.get("financial", 0) / 4) * 100),
+                clamp((s.get("anxiety", 2) - 1) / 4 * 100),
+                clamp((s.get("depression_flag", 0) / 4) * 100),
+                clamp((s.get("concentration", 1) / 4) * 100),
+                clamp((s.get("panic", 0) / 4) * 100),
+                clamp((s.get("social_isolation", 2) - 1) / 3 * 100),
+                clamp((s.get("peer_pressure", 2) - 1) / 4 * 100),
+                clamp((s.get("home_stress", 2) - 1) / 3 * 100),
+                clamp((s.get("relationship_stress", 1) / 4) * 100),
+            ]
+            weights = [1.15, 0.7, 0.75, 0.45, 0.75, 1.15, 0.75, 0.9,
+                       1.35, 1.25, 0.95, 1.05, 0.95, 0.8, 0.9, 0.7]
+            return sum(v * w for v, w in zip(signals, weights)) / sum(weights)
+
         s = inputs
         feat = {
             "anxiety_level":              scale(s.get("anxiety", 2), 1, 5, 0, 21),
@@ -229,12 +255,21 @@ class StressPredictor:
         pred = self.model.predict(X)[0]
         proba = self.model.predict_proba(X)[0]
 
-        stress_pct = round(int(pred) / 2 * 100 + (proba[2] * 30), 1)
-        stress_pct = min(100, max(0, stress_pct))
+        survey_pct = severity_score(s)
+        model_pct = int(pred) / 2 * 100 + (proba[2] * 30)
+        stress_pct = float(round(clamp((survey_pct * 0.72) + (model_pct * 0.28)), 1))
+
+        calibrated_pred = int(pred)
+        if stress_pct >= 76:
+            calibrated_pred = 2
+        elif stress_pct >= 38:
+            calibrated_pred = 1
+        else:
+            calibrated_pred = 0
 
         return {
-            "stress_level": int(pred),
-            "stress_label": STRESS_LABELS[int(pred)],
+            "stress_level": calibrated_pred,
+            "stress_label": STRESS_LABELS[calibrated_pred],
             "stress_pct": stress_pct,
             "confidence": round(float(proba.max()) * 100, 1),
             "probabilities": {

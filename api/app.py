@@ -31,65 +31,65 @@ with open(os.path.join(MODEL_DIR, "model_metadata.json")) as f:
 
 SOLUTIONS_DB = {
     "sleep": {
-        "title": "Improve your sleep schedule",
+        "title": "Reset your sleep before the next class day",
         "category": "Sleep hygiene",
-        "body": "Poor sleep amplifies every other stress factor. A consistent 7-9 hour routine is one of the highest-ROI changes you can make.",
-        "tips": ["Sleep & wake at the same time daily", "30-min screen-free wind-down ritual",
-                 "No caffeine after 2 PM", "Keep room cool & dark (18–20°C)"]
+        "body": "Irregular sleep makes classes, travel, exams, and hostel life feel heavier. A repeatable night routine is the fastest stabilizer.",
+        "tips": ["Fix one wake-up time, even after late study nights", "Keep phone away for the last 25 minutes",
+                 "Avoid chai, coffee, or energy drinks after evening snacks", "Use an eye mask or cotton earplugs in hostel rooms"]
     },
     "academics": {
-        "title": "Reframe your academic approach",
+        "title": "Make a 7-day exam and assignment map",
         "category": "Academic strategy",
-        "body": "High academic load often stems from poor planning. Structured time-blocking can cut perceived overwhelm significantly.",
-        "tips": ["Pomodoro: 25 min on, 5 min off", "Weekly study plan every Sunday",
-                 "Visit professor office hours early", "Form a 3-person study group"]
+        "body": "Indian students often juggle internals, practicals, semester exams, coaching, and family expectations. A visible weekly map reduces panic.",
+        "tips": ["Write every deadline on one page or calendar", "Use 45-min study blocks with 10-min breaks",
+                 "Ask a classmate for notes before the backlog grows", "Meet faculty or a mentor before marks become urgent"]
     },
     "exercise": {
-        "title": "Add movement to your day",
+        "title": "Add low-cost movement",
         "category": "Physical wellness",
-        "body": "Even 20–30 min of physical activity 3x/week reduces cortisol and dramatically improves mood and sleep quality.",
-        "tips": ["Walk or cycle to class", "7-min HIIT workout at home",
-                 "Join a campus sports club", "Stretch every 90 minutes of sitting"]
+        "body": "You do not need a gym plan. Regular movement between classes can lower tension and improve sleep.",
+        "tips": ["Walk one extra campus round after lunch", "Try 10 minutes of skipping, yoga, or stairs",
+                 "Play badminton, cricket, football, or throwball with friends", "Stretch neck and shoulders after long laptop sessions"]
     },
     "mental": {
-        "title": "Build mental health micro-routines",
+        "title": "Use small mental-health routines",
         "category": "Mental health",
-        "body": "Anxiety and low mood are common but not inevitable. Small daily practices compound into lasting resilience.",
-        "tips": ["5-min morning journaling", "Box breathing: 4s in, 4s hold, 4s out, 4s hold",
-                 "3 gratitude entries every night", "Try Headspace or Calm app"]
+        "body": "Anxiety, low mood, and pressure around marks are common, but they should not be ignored or hidden.",
+        "tips": ["Write the top 3 worries and the next small action for each", "Try 4-4-4 breathing before class or exams",
+                 "Tell one trusted friend, sibling, mentor, or warden what is happening", "Take a 15-minute sunlight break without scrolling"]
     },
     "social": {
-        "title": "Strengthen your support network",
+        "title": "Reconnect without making it a big event",
         "category": "Social connection",
-        "body": "Social isolation is a major stress amplifier. One meaningful conversation a day measurably lowers cortisol.",
-        "tips": ["Text one friend today", "Join a campus club or society",
-                 "Set clear boundaries in stressful relationships",
-                 "Attend one social event this week"]
+        "body": "Isolation can build quickly in hostel, PG, commute, or online-class routines. One real conversation can soften the day.",
+        "tips": ["Call home or a friend for 10 minutes", "Eat one meal with classmates instead of alone",
+                 "Join a club, NSS/NCC, sports group, or department activity",
+                 "Set boundaries with people who constantly compare marks or placements"]
     },
     "professional": {
-        "title": "Reach out to a professional",
+        "title": "Talk to a real support person",
         "category": "Professional support",
-        "body": "Your stress indicators suggest you'd benefit from talking to a counselor or therapist. This is a sign of strength.",
-        "tips": ["Book a campus counseling session", "Try iCall (India) or BetterHelp",
-                 "Tell a trusted adult how you're feeling",
-                 "Helpline: iCall 9152987821 | Vandrevala 1860-2662-345"]
+        "body": "When stress is high, support should be practical and human. Asking for help early is a smart step.",
+        "tips": ["Book your college counselor or student welfare office", "Speak with a mentor, class teacher, warden, or trusted adult",
+                 "For immediate emotional support in India: Tele-MANAS 14416 or 1-800-891-4416",
+                 "If you may harm yourself, contact local emergency services or go to the nearest hospital"]
     },
     "quick_wins": {
-        "title": "Immediate stress relief",
+        "title": "Five-minute reset",
         "category": "Quick wins (5 min or less)",
-        "body": "These techniques work within minutes and require no equipment. Use them whenever overwhelmed.",
-        "tips": ["Cold water on face and wrists", "4-7-8 breathing technique",
-                 "Step outside for a 10-minute walk", "Listen to one song you love"]
+        "body": "Use these when the pressure spikes before class, viva, placement prep, or family calls.",
+        "tips": ["Wash face and wrists with cool water", "Name 5 things you can see and 4 sounds you can hear",
+                 "Step outside the classroom, hostel, or PG for fresh air", "Listen to one familiar song and breathe slowly"]
     },
     "music": {
-        "title": "Listen to music on Spotify",
+        "title": "Play a mood-lifting track",
         "category": "Music & Relaxation",
-        "body": "Music is scientifically proven to reduce stress and anxiety. Spotify has curated playlists for every mood.",
+        "body": "Music can interrupt spiralling thoughts and make a study break feel lighter.",
         "tips": [
-            "🎵 Spotify: 'Peaceful Piano' - perfect for focusing and calming down",
-            "🎵 Spotify: 'Good as Hell' - uplifting vibes and positive energy",
-            "🎵 Spotify: 'Chill Hits' - modern tracks for relaxing and unwinding",
-            "🎵 Spotify: 'Stress Relief' - scientifically designed for anxiety relief"
+            "Try calm instrumental music during revision",
+            "Use upbeat Bollywood, indie, or regional songs for a short reset",
+            "Make a 3-song playlist for breaks only",
+            "Avoid sad loops when you are already low"
         ],
         "spotify_link": "https://open.spotify.com/search/stress%20relief"
     }
@@ -236,14 +236,20 @@ def predict():
         # Compute factor scores for visualization
         result["factors"] = {
             "Sleep quality":        round(max(0, (8 - inputs.get("sleep_hours", 7)) / 6 * 100)),
-            "Academic load":        round((inputs.get("study_load", 3) - 1) / 4 * 100),
+            "Academic load":        round(((inputs.get("study_load", 3) - 1) / 4 +
+                                           (4 - min(inputs.get("cgpa", 7.5), 4)) / 4 +
+                                           inputs.get("financial", 0) / 4) / 3 * 100),
             "Mental health":        round(((inputs.get("anxiety", 2) - 1) +
                                            inputs.get("depression_flag", 0) +
-                                           inputs.get("panic", 0)) / 14 * 100),
+                                           inputs.get("concentration", 1) +
+                                           inputs.get("panic", 0)) / 16 * 100),
             "Social environment":   round(((inputs.get("social_isolation", 2) - 1) +
-                                           (inputs.get("peer_pressure", 2) - 1)) / 8 * 100),
+                                           (inputs.get("peer_pressure", 2) - 1) +
+                                           (inputs.get("home_stress", 2) - 1) +
+                                           inputs.get("relationship_stress", 1)) / 14 * 100),
             "Lifestyle":            round((inputs.get("screen_hours", 4) / 12 +
-                                           (inputs.get("exercise", 2) - 1) / 3) / 2 * 100),
+                                           (inputs.get("exercise", 2) - 1) / 3 +
+                                           inputs.get("weight_change", 0) / 3) / 3 * 100),
         }
 
         return jsonify(result)
