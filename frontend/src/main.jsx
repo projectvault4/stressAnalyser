@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
@@ -193,11 +193,6 @@ function App() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [apiStatus, setApiStatus] = useState({
-    checked: false,
-    ok: true,
-    version: ""
-  });
 
   const stressTone = useMemo(() => {
     const label = result?.stress_label?.toLowerCase();
@@ -218,39 +213,6 @@ function App() {
     setInputs((current) => ({ ...current, [name]: Number(value) }));
   }
 
-  useEffect(() => {
-    let ignore = false;
-
-    async function checkApiVersion() {
-      try {
-        const response = await fetch(apiUrl("/health"));
-        const data = await response.json();
-
-        if (!ignore) {
-          setApiStatus({
-            checked: true,
-            ok: data.api_version === EXPECTED_API_VERSION,
-            version: data.api_version || "missing"
-          });
-        }
-      } catch {
-        if (!ignore) {
-          setApiStatus({
-            checked: true,
-            ok: false,
-            version: "unreachable"
-          });
-        }
-      }
-    }
-
-    checkApiVersion();
-
-    return () => {
-      ignore = true;
-    };
-  }, []);
-
   async function predictStress(event) {
     event.preventDefault();
     setLoading(true);
@@ -266,14 +228,6 @@ function App() {
 
       if (!response.ok) {
         throw new Error(data.error || "Prediction failed");
-      }
-
-      if (data.api_version !== EXPECTED_API_VERSION) {
-        setApiStatus({
-          checked: true,
-          ok: false,
-          version: data.api_version || "missing"
-        });
       }
 
       setResult(data);
@@ -298,12 +252,6 @@ function App() {
         </div>
 
         <form className="survey-panel" onSubmit={predictStress}>
-          {apiStatus.checked && !apiStatus.ok ? (
-            <p className="deploy-warning">
-              Backend is stale or unreachable. Expected {EXPECTED_API_VERSION}, got {apiStatus.version}.
-            </p>
-          ) : null}
-
           {fieldGroups.map((group) => (
             <fieldset key={group.title}>
               <legend>{group.title}</legend>
