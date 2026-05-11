@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
-const EXPECTED_API_VERSION = "2026-05-11-stress-score-v2";
+const EXPECTED_API_VERSION = "2026-05-11-stress-score-v3";
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
 function apiUrl(path) {

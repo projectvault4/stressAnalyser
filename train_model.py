@@ -257,16 +257,16 @@ class StressPredictor:
 
             domain_scores = [sleep_strain, lifestyle, academic, mental, social]
             weighted_score = (
-                sleep_strain * 0.14 +
-                lifestyle * 0.22 +
-                academic * 0.28 +
-                mental * 0.24 +
-                social * 0.12
+                sleep_strain * 0.10 +
+                lifestyle * 0.16 +
+                academic * 0.30 +
+                mental * 0.30 +
+                social * 0.14
             )
-            top_two_score = sum(sorted(domain_scores, reverse=True)[:2]) / 2
-            peak_count = sum(1 for score in domain_scores if score >= 65)
-            peak_boost = min(12, peak_count * 4)
-            return clamp(max(weighted_score, top_two_score * 0.94) + peak_boost)
+            elevated_count = sum(1 for score in domain_scores if score >= 45)
+            severe_count = sum(1 for score in domain_scores if score >= 70)
+            multi_domain_boost = max(0, elevated_count - 1) * 5 + max(0, severe_count - 1) * 4
+            return clamp(weighted_score + multi_domain_boost)
 
         def calibrated_probability_set(stress_pct, stress_level):
             if stress_level == 2:
@@ -323,7 +323,7 @@ class StressPredictor:
 
         survey_pct = severity_score(s)
         model_pct = int(pred) / 2 * 100 + (proba[2] * 30)
-        stress_pct = float(round(clamp((survey_pct * 0.9) + (model_pct * 0.1)), 1))
+        stress_pct = float(round(clamp((survey_pct * 0.96) + (model_pct * 0.04)), 1))
 
         calibrated_pred = int(pred)
         if stress_pct >= 58:

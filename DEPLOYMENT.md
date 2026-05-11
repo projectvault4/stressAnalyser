@@ -39,7 +39,7 @@ curl -s https://stress-detector-api-yhx4.onrender.com/health
 The response must include:
 
 ```json
-{"api_version":"2026-05-11-stress-score-v2"}
+{"api_version":"2026-05-11-stress-score-v3"}
 ```
 
 Then submit a prediction and confirm the `factors` keys use the current labels:

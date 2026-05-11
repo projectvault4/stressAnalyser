@@ -23,7 +23,7 @@ app = Flask(__name__, static_folder=FRONTEND_DIST, static_url_path="")
 CORS(app)
 
 MODEL_DIR = os.path.join(ROOT_DIR, "models")
-API_VERSION = "2026-05-11-stress-score-v2"
+API_VERSION = "2026-05-11-stress-score-v3"
 
 # Load models at startup
 predictor = StressPredictor(os.path.join(MODEL_DIR, "primary_model.pkl"))
