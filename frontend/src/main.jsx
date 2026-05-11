@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
-const EXPECTED_API_VERSION = "2026-05-11-stress-score-v4";
+const EXPECTED_API_VERSION = "2026-05-11-stress-score-v5";
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
 function apiUrl(path) {
@@ -151,6 +151,109 @@ const fieldGroups = [
   }
 ];
 
+const solutionsByKey = {
+  low_maintenance: {
+    title: "Keep the routine that is working",
+    category: "Low stress plan",
+    tips: [
+      "Keep your current sleep and meal rhythm steady",
+      "Use one short break after long study blocks",
+      "Check in with a friend or family member today"
+    ]
+  },
+  moderate_plan: {
+    title: "Reduce load for the next 48 hours",
+    category: "Moderate stress plan",
+    tips: [
+      "Pick the top 2 academic tasks and pause the rest",
+      "Use 45-min study blocks with 10-min breaks",
+      "Tell one trusted person what feels heavy"
+    ]
+  },
+  high_support: {
+    title: "Get support and lower demands today",
+    category: "High stress plan",
+    tips: [
+      "Speak to a counselor, mentor, warden, or trusted adult today",
+      "Postpone one non-urgent task or commitment",
+      "Stay near supportive people instead of isolating"
+    ]
+  },
+  sleep: {
+    title: "Reset your sleep before the next class day",
+    category: "Sleep hygiene",
+    tips: [
+      "Fix one wake-up time, even after late study nights",
+      "Keep phone away for the last 25 minutes",
+      "Avoid chai, coffee, or energy drinks after evening snacks"
+    ]
+  },
+  academics: {
+    title: "Make a 7-day exam and assignment map",
+    category: "Academic strategy",
+    tips: [
+      "Write every deadline on one page or calendar",
+      "Use 45-min study blocks with 10-min breaks",
+      "Ask a classmate for notes before the backlog grows"
+    ]
+  },
+  exercise: {
+    title: "Add low-cost movement",
+    category: "Physical wellness",
+    tips: [
+      "Walk one extra campus round after lunch",
+      "Try 10 minutes of skipping, yoga, or stairs",
+      "Stretch neck and shoulders after long laptop sessions"
+    ]
+  },
+  mental: {
+    title: "Use small mental-health routines",
+    category: "Mental health",
+    tips: [
+      "Write the top 3 worries and the next small action for each",
+      "Try 4-4-4 breathing before class or exams",
+      "Tell one trusted friend, sibling, mentor, or warden what is happening"
+    ]
+  },
+  social: {
+    title: "Reconnect without making it a big event",
+    category: "Social connection",
+    tips: [
+      "Call home or a friend for 10 minutes",
+      "Eat one meal with classmates instead of alone",
+      "Set boundaries with people who constantly compare marks or placements"
+    ]
+  },
+  professional: {
+    title: "Talk to a real support person",
+    category: "Professional support",
+    tips: [
+      "Book your college counselor or student welfare office",
+      "Speak with a mentor, class teacher, warden, or trusted adult",
+      "For immediate emotional support in India: Tele-MANAS 14416 or 1-800-891-4416"
+    ]
+  },
+  quick_wins: {
+    title: "Five-minute reset",
+    category: "Quick wins (5 min or less)",
+    tips: [
+      "Wash face and wrists with cool water",
+      "Name 5 things you can see and 4 sounds you can hear",
+      "Step outside the classroom, hostel, or PG for fresh air"
+    ]
+  },
+  music: {
+    title: "Play a mood-lifting track",
+    category: "Music & Relaxation",
+    tips: [
+      "Try calm instrumental music during revision",
+      "Use upbeat Bollywood, indie, or regional songs for a short reset",
+      "Make a 3-song playlist for breaks only"
+    ],
+    spotify_link: "https://open.spotify.com/search/stress%20relief"
+  }
+};
+
 const defaultInputs = fieldGroups
   .flatMap((group) => group.fields)
   .reduce((values, field) => ({ ...values, [field.name]: field.value }), {});
@@ -244,6 +347,25 @@ function calculateStressSummary(factors) {
   };
 }
 
+function generateRecommendedSolutions(result, inputs, factors) {
+  const keys = [];
+
+  if (result.stress_level === 0) keys.push("low_maintenance");
+  if (result.stress_level === 1) keys.push("moderate_plan");
+  if (result.stress_level === 2) keys.push("high_support");
+
+  if (factors["Sleep strain"] >= 35 || inputs.sleep_hours < 6.5) keys.push("sleep");
+  if (factors["Academic pressure"] >= 45 || inputs.study_load >= 4 || inputs.cgpa < 6) keys.push("academics");
+  if (factors["Lifestyle strain"] >= 50 || inputs.exercise >= 3) keys.push("exercise");
+  if (factors["Mental strain"] >= 45 || inputs.anxiety >= 3 || inputs.depression_flag >= 2) keys.push("mental");
+  if (factors["Social pressure"] >= 45 || inputs.social_isolation >= 3) keys.push("social");
+  if (result.stress_level === 2 || result.stress_pct >= 70) keys.push("professional");
+  if (result.stress_level >= 1) keys.push("quick_wins");
+  if (result.stress_level <= 1) keys.push("music");
+
+  return [...new Set(keys)].map((key) => solutionsByKey[key]);
+}
+
 function App() {
   const [inputs, setInputs] = useState(defaultInputs);
   const [result, setResult] = useState(null);
@@ -273,6 +395,11 @@ function App() {
     if (label === "moderate") return "moderate";
     return "low";
   }, [displayResult]);
+
+  const recommendedSolutions = useMemo(() => {
+    if (!displayResult) return [];
+    return generateRecommendedSolutions(displayResult, inputs, factorScores);
+  }, [displayResult, factorScores, inputs]);
 
   function updateField(name, value) {
     setInputs((current) => ({ ...current, [name]: Number(value) }));
@@ -398,7 +525,7 @@ function App() {
             <section>
               <h3>Recommended Actions</h3>
               <div className="solutions">
-                {displayResult.solutions.map((solution) => (
+                {recommendedSolutions.map((solution) => (
                   <article key={solution.title}>
                     <p>{solution.category}</p>
                     <h4>{solution.title}</h4>

@@ -23,7 +23,7 @@ app = Flask(__name__, static_folder=FRONTEND_DIST, static_url_path="")
 CORS(app)
 
 MODEL_DIR = os.path.join(ROOT_DIR, "models")
-API_VERSION = "2026-05-11-stress-score-v4"
+API_VERSION = "2026-05-11-stress-score-v5"
 
 # Load models at startup
 predictor = StressPredictor(os.path.join(MODEL_DIR, "primary_model.pkl"))
@@ -31,6 +31,27 @@ with open(os.path.join(MODEL_DIR, "model_metadata.json")) as f:
     metadata = json.load(f)
 
 SOLUTIONS_DB = {
+    "low_maintenance": {
+        "title": "Keep the routine that is working",
+        "category": "Low stress plan",
+        "body": "Low stress still benefits from simple maintenance so it does not build up during busy academic weeks.",
+        "tips": ["Keep your current sleep and meal rhythm steady", "Use one short break after long study blocks",
+                 "Check in with a friend or family member today", "Protect time for a hobby, sport, or quiet reset"]
+    },
+    "moderate_plan": {
+        "title": "Reduce load for the next 48 hours",
+        "category": "Moderate stress plan",
+        "body": "Moderate stress is a signal to simplify the next two days and handle the biggest pressure points first.",
+        "tips": ["Pick the top 2 academic tasks and pause the rest", "Use 45-min study blocks with 10-min breaks",
+                 "Tell one trusted person what feels heavy", "Sleep 30 minutes earlier tonight if possible"]
+    },
+    "high_support": {
+        "title": "Get support and lower demands today",
+        "category": "High stress plan",
+        "body": "High stress deserves fast support, fewer demands, and a real person in the loop.",
+        "tips": ["Speak to a counselor, mentor, warden, or trusted adult today", "Postpone one non-urgent task or commitment",
+                 "Stay near supportive people instead of isolating", "Use urgent help if you might harm yourself"]
+    },
     "sleep": {
         "title": "Reset your sleep before the next class day",
         "category": "Sleep hygiene",
@@ -106,7 +127,15 @@ def generate_solutions(result: dict, inputs: dict) -> list:
     exercise = inputs.get("exercise", 2)
     social = inputs.get("social_isolation", 2)
     study = inputs.get("study_load", 3)
+    level = result["stress_level"]
     pct = result["stress_pct"]
+
+    if level == 0:
+        solutions.append(SOLUTIONS_DB["low_maintenance"])
+    elif level == 1:
+        solutions.append(SOLUTIONS_DB["moderate_plan"])
+    else:
+        solutions.append(SOLUTIONS_DB["high_support"])
 
     if sleep < 6.5:
         solutions.append(SOLUTIONS_DB["sleep"])
@@ -118,12 +147,21 @@ def generate_solutions(result: dict, inputs: dict) -> list:
         solutions.append(SOLUTIONS_DB["mental"])
     if social >= 3:
         solutions.append(SOLUTIONS_DB["social"])
-    if pct >= 70:
+    if level == 2 or pct >= 70:
         solutions.append(SOLUTIONS_DB["professional"])
-    # Always include quick wins and music
-    solutions.append(SOLUTIONS_DB["quick_wins"])
-    solutions.append(SOLUTIONS_DB["music"])
-    return solutions
+    if level >= 1:
+        solutions.append(SOLUTIONS_DB["quick_wins"])
+    if level <= 1:
+        solutions.append(SOLUTIONS_DB["music"])
+
+    unique_solutions = []
+    seen_titles = set()
+    for solution in solutions:
+        if solution["title"] not in seen_titles:
+            unique_solutions.append(solution)
+            seen_titles.add(solution["title"])
+
+    return unique_solutions
 
 
 # ── Routes ────────────────────────────────────────
