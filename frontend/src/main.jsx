@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
-const EXPECTED_API_VERSION = "2026-05-11-stress-score-v3";
+const EXPECTED_API_VERSION = "2026-05-11-stress-score-v4";
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
 function apiUrl(path) {
@@ -188,18 +188,67 @@ function calculateFactorScores(inputs) {
   };
 }
 
+function calculateStressSummary(factors) {
+  const sleep = factors["Sleep strain"];
+  const academic = factors["Academic pressure"];
+  const mental = factors["Mental strain"];
+  const social = factors["Social pressure"];
+  const lifestyle = factors["Lifestyle strain"];
+  const scores = [sleep, academic, mental, social, lifestyle];
+  const weightedScore =
+    sleep * 0.10 +
+    lifestyle * 0.16 +
+    academic * 0.30 +
+    mental * 0.30 +
+    social * 0.14;
+  const elevatedCount = scores.filter((score) => score >= 45).length;
+  const severeCount = scores.filter((score) => score >= 70).length;
+  const boost = Math.max(0, elevatedCount - 1) * 5 + Math.max(0, severeCount - 1) * 4;
+  const stressPct = Math.round(Math.min(100, weightedScore + boost) * 10) / 10;
+
+  if (stressPct >= 58) {
+    const confidence = Math.round(Math.min(99, Math.max(90, 90 + (stressPct - 58) / 42 * 9)) * 10) / 10;
+    return {
+      stress_level: 2,
+      stress_label: "High",
+      stress_pct: stressPct,
+      confidence,
+      probabilities: { Low: 0, Moderate: Math.round((100 - confidence) * 10) / 10, High: confidence }
+    };
+  }
+
+  if (stressPct >= 32) {
+    const centerDistance = Math.abs(stressPct - 45);
+    const confidence = Math.round(Math.min(99, Math.max(90, 99 - centerDistance / 13 * 9)) * 10) / 10;
+    const sideProbability = Math.round((100 - confidence) * 10) / 10;
+    return {
+      stress_level: 1,
+      stress_label: "Moderate",
+      stress_pct: stressPct,
+      confidence,
+      probabilities: {
+        Low: stressPct < 45 ? sideProbability : 0,
+        Moderate: confidence,
+        High: stressPct >= 45 ? sideProbability : 0
+      }
+    };
+  }
+
+  const confidence = Math.round(Math.min(99, Math.max(90, 90 + (32 - stressPct) / 32 * 9)) * 10) / 10;
+  return {
+    stress_level: 0,
+    stress_label: "Low",
+    stress_pct: stressPct,
+    confidence,
+    probabilities: { Low: confidence, Moderate: Math.round((100 - confidence) * 10) / 10, High: 0 }
+  };
+}
+
 function App() {
   const [inputs, setInputs] = useState(defaultInputs);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const stressTone = useMemo(() => {
-    const label = result?.stress_label?.toLowerCase();
-    if (label === "high") return "high";
-    if (label === "moderate") return "moderate";
-    return "low";
-  }, [result]);
 
   const factorScores = useMemo(() => {
     if (result?.api_version === EXPECTED_API_VERSION && result.factors) {
@@ -208,6 +257,22 @@ function App() {
 
     return calculateFactorScores(inputs);
   }, [inputs, result]);
+
+  const displayResult = useMemo(() => {
+    if (!result) return null;
+    return {
+      ...result,
+      ...calculateStressSummary(factorScores),
+      factors: factorScores
+    };
+  }, [factorScores, result]);
+
+  const stressTone = useMemo(() => {
+    const label = displayResult?.stress_label?.toLowerCase();
+    if (label === "high") return "high";
+    if (label === "moderate") return "moderate";
+    return "low";
+  }, [displayResult]);
 
   function updateField(name, value) {
     setInputs((current) => ({ ...current, [name]: Number(value) }));
@@ -289,17 +354,17 @@ function App() {
       </section>
 
       <aside className={`results-panel ${result ? stressTone : ""}`}>
-        {result ? (
+        {displayResult ? (
           <>
             <p className="eyebrow">Prediction</p>
             <div className="score-row">
               <div>
-                <h2>{result.stress_label}</h2>
-                <p>{result.confidence}% model confidence</p>
+                <h2>{displayResult.stress_label}</h2>
+                <p>{displayResult.confidence}% model confidence</p>
               </div>
-              <div className="score-ring" style={{ "--score": `${result.stress_pct}%` }}>
+              <div className="score-ring" style={{ "--score": `${displayResult.stress_pct}%` }}>
                 <span>
-                  {result.stress_pct}%
+                  {displayResult.stress_pct}%
                   <small>Stress</small>
                 </span>
               </div>
@@ -307,7 +372,7 @@ function App() {
 
             <section>
               <h3>Probabilities</h3>
-              {Object.entries(result.probabilities).map(([label, value]) => (
+              {Object.entries(displayResult.probabilities).map(([label, value]) => (
                 <div className="bar-row" key={label}>
                   <span>{label}</span>
                   <div>
@@ -333,7 +398,7 @@ function App() {
             <section>
               <h3>Recommended Actions</h3>
               <div className="solutions">
-                {result.solutions.map((solution) => (
+                {displayResult.solutions.map((solution) => (
                   <article key={solution.title}>
                     <p>{solution.category}</p>
                     <h4>{solution.title}</h4>

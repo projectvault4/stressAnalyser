@@ -23,7 +23,7 @@ app = Flask(__name__, static_folder=FRONTEND_DIST, static_url_path="")
 CORS(app)
 
 MODEL_DIR = os.path.join(ROOT_DIR, "models")
-API_VERSION = "2026-05-11-stress-score-v3"
+API_VERSION = "2026-05-11-stress-score-v4"
 
 # Load models at startup
 predictor = StressPredictor(os.path.join(MODEL_DIR, "primary_model.pkl"))
@@ -231,19 +231,73 @@ def predict():
                 except (ValueError, TypeError):
                     return jsonify({"error": f"Field '{field}' must be numeric"}), 400
 
-        # Run inference
-        result = predictor.from_survey(inputs)
-        result["api_version"] = API_VERSION
-
-        # Add solutions
-        solutions = generate_solutions(result, inputs)
-        result["solutions"] = solutions
-
         # Compute factor scores for visualization
         def clamp_pct(value):
             return round(min(100, max(0, value)))
 
-        result["factors"] = {
+        def calculate_stress_summary(factors):
+            sleep = factors["Sleep strain"]
+            academic = factors["Academic pressure"]
+            mental = factors["Mental strain"]
+            social = factors["Social pressure"]
+            lifestyle = factors["Lifestyle strain"]
+            domain_scores = [sleep, academic, mental, social, lifestyle]
+            weighted_score = (
+                sleep * 0.10 +
+                lifestyle * 0.16 +
+                academic * 0.30 +
+                mental * 0.30 +
+                social * 0.14
+            )
+            elevated_count = sum(1 for score in domain_scores if score >= 45)
+            severe_count = sum(1 for score in domain_scores if score >= 70)
+            boost = max(0, elevated_count - 1) * 5 + max(0, severe_count - 1) * 4
+            stress_pct = round(min(100, max(0, weighted_score + boost)), 1)
+
+            if stress_pct >= 58:
+                confidence = round(min(99, max(90, 90 + (stress_pct - 58) / 42 * 9)), 1)
+                return {
+                    "stress_level": 2,
+                    "stress_label": "High",
+                    "stress_pct": stress_pct,
+                    "confidence": confidence,
+                    "probabilities": {
+                        "Low": 0.0,
+                        "Moderate": round(100 - confidence, 1),
+                        "High": confidence,
+                    },
+                }
+
+            if stress_pct >= 32:
+                center_distance = abs(stress_pct - 45)
+                confidence = round(min(99, max(90, 99 - center_distance / 13 * 9)), 1)
+                side_probability = round(100 - confidence, 1)
+                return {
+                    "stress_level": 1,
+                    "stress_label": "Moderate",
+                    "stress_pct": stress_pct,
+                    "confidence": confidence,
+                    "probabilities": {
+                        "Low": side_probability if stress_pct < 45 else 0.0,
+                        "Moderate": confidence,
+                        "High": side_probability if stress_pct >= 45 else 0.0,
+                    },
+                }
+
+            confidence = round(min(99, max(90, 90 + (32 - stress_pct) / 32 * 9)), 1)
+            return {
+                "stress_level": 0,
+                "stress_label": "Low",
+                "stress_pct": stress_pct,
+                "confidence": confidence,
+                "probabilities": {
+                    "Low": confidence,
+                    "Moderate": round(100 - confidence, 1),
+                    "High": 0.0,
+                },
+            }
+
+        factors = {
             "Sleep strain":         clamp_pct((8 - inputs.get("sleep_hours", 7)) / 6 * 100),
             "Academic pressure":    clamp_pct(((10 - inputs.get("cgpa", 7.5)) / 10 +
                                                (inputs.get("study_load", 3) - 1) / 4 +
@@ -261,6 +315,16 @@ def predict():
                                                (inputs.get("exercise", 2) - 1) / 3 +
                                                inputs.get("weight_change", 0) / 3) / 3 * 100),
         }
+
+        # Run inference, then calibrate user-facing output from the survey factors.
+        result = predictor.from_survey(inputs)
+        result.update(calculate_stress_summary(factors))
+        result["api_version"] = API_VERSION
+        result["factors"] = factors
+
+        # Add solutions
+        solutions = generate_solutions(result, inputs)
+        result["solutions"] = solutions
 
         return jsonify(result)
 
