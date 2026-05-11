@@ -1,8 +1,13 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://stress-detector-api-yhx4.onrender.com";
+const EXPECTED_API_VERSION = "2026-05-11-stress-score-v2";
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+
+function apiUrl(path) {
+  return `${API_BASE_URL}${path}`;
+}
 
 const wheelActivities = [
   { title: "Badminton", lines: ["Play", "Badminton"], color: "#ffdc37" },
@@ -155,6 +160,11 @@ function App() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [apiStatus, setApiStatus] = useState({
+    checked: false,
+    ok: true,
+    version: ""
+  });
 
   const stressTone = useMemo(() => {
     const label = result?.stress_label?.toLowerCase();
@@ -167,13 +177,46 @@ function App() {
     setInputs((current) => ({ ...current, [name]: Number(value) }));
   }
 
+  useEffect(() => {
+    let ignore = false;
+
+    async function checkApiVersion() {
+      try {
+        const response = await fetch(apiUrl("/health"));
+        const data = await response.json();
+
+        if (!ignore) {
+          setApiStatus({
+            checked: true,
+            ok: data.api_version === EXPECTED_API_VERSION,
+            version: data.api_version || "missing"
+          });
+        }
+      } catch {
+        if (!ignore) {
+          setApiStatus({
+            checked: true,
+            ok: false,
+            version: "unreachable"
+          });
+        }
+      }
+    }
+
+    checkApiVersion();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
   async function predictStress(event) {
     event.preventDefault();
     setLoading(true);
     setError("");
 
     try {
-      const response = await fetch(`${API_BASE_URL}/predict`, {
+      const response = await fetch(apiUrl("/predict"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(inputs)
@@ -206,6 +249,12 @@ function App() {
         </div>
 
         <form className="survey-panel" onSubmit={predictStress}>
+          {apiStatus.checked && !apiStatus.ok ? (
+            <p className="deploy-warning">
+              Backend is stale or unreachable. Expected {EXPECTED_API_VERSION}, got {apiStatus.version}.
+            </p>
+          ) : null}
+
           {fieldGroups.map((group) => (
             <fieldset key={group.title}>
               <legend>{group.title}</legend>

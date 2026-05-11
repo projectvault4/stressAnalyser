@@ -1,54 +1,53 @@
-# Deployment
+# Render Deployment
 
-## Backend on Render
+This project runs as one Render Web Service. Flask serves both the API and the
+built React frontend from `frontend/dist`.
 
-Create a Web Service from this repository and use these settings:
+## Render Settings
+
+Create or update the Render Web Service with these settings:
 
 ```text
-Root Directory: stress_detector
-Build Command: pip install -r requirements.txt
+Build Command: pip install -r requirements.txt && npm run build
 Start Command: gunicorn api.app:app
 Health Check Path: /health
 ```
 
-If Render is already connected to this repo, redeploy after pushing these files.
-
-Backend URL used by the frontend:
+If Render is pointed at the parent folder, set:
 
 ```text
-https://stress-detector-api-yhx4.onrender.com
+Root Directory: stress-detector-ml-project
 ```
 
-## Frontend on Vercel
+If Render is already pointed directly at this project folder, leave Root
+Directory blank.
 
-Use these settings if Vercel points directly at the React folder:
+Do not set `VITE_API_BASE_URL` for this Render-only setup. Leaving it unset
+makes the React app call same-origin endpoints like `/predict`, which are
+served by the same Flask app.
+
+After pushing changes, redeploy on Render without build cache.
+
+## Verify The Deploy
+
+Check the live service:
+
+```bash
+curl -s https://stress-detector-api-yhx4.onrender.com/health
+```
+
+The response must include:
+
+```json
+{"api_version":"2026-05-11-stress-score-v2"}
+```
+
+Then submit a prediction and confirm the `factors` keys use the current labels:
 
 ```text
-Root Directory: stress_detector/frontend
-Build Command: npm run build
-Output Directory: dist
+Sleep strain, Academic pressure, Mental strain, Social pressure, Lifestyle strain
 ```
 
-Use these settings if Vercel points at the project folder instead:
-
-```text
-Root Directory: stress_detector
-Build Command: npm run build
-Output Directory: frontend/dist
-```
-
-After changing settings, redeploy with:
-
-```text
-Redeploy without build cache
-```
-
-## How to verify
-
-The deployed Vercel JavaScript bundle must contain:
-
-```text
-stress-detector-api-yhx4.onrender.com
-```
-
-If it still calls `/predict`, the deployed frontend is stale or using the wrong root directory.
+If `/health` does not include `api_version`, or the app shows a stale-backend
+warning, Render is still serving older code. Check the Render branch, root
+directory, build logs, and whether `VITE_API_BASE_URL` was accidentally set.
