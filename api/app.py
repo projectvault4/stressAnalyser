@@ -23,6 +23,7 @@ app = Flask(__name__, static_folder=FRONTEND_DIST, static_url_path="")
 CORS(app)
 
 MODEL_DIR = os.path.join(ROOT_DIR, "models")
+API_VERSION = "2026-05-11-stress-score-v2"
 
 # Load models at startup
 predictor = StressPredictor(os.path.join(MODEL_DIR, "primary_model.pkl"))
@@ -164,7 +165,11 @@ def serve_frontend(path):
 
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok", "model_loaded": predictor.model is not None})
+    return jsonify({
+        "status": "ok",
+        "model_loaded": predictor.model is not None,
+        "api_version": API_VERSION
+    })
 
 
 @app.route("/metadata", methods=["GET"])
@@ -228,6 +233,7 @@ def predict():
 
         # Run inference
         result = predictor.from_survey(inputs)
+        result["api_version"] = API_VERSION
 
         # Add solutions
         solutions = generate_solutions(result, inputs)
