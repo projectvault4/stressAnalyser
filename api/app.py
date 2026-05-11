@@ -234,22 +234,26 @@ def predict():
         result["solutions"] = solutions
 
         # Compute factor scores for visualization
+        def clamp_pct(value):
+            return round(min(100, max(0, value)))
+
         result["factors"] = {
-            "Sleep quality":        round(max(0, (8 - inputs.get("sleep_hours", 7)) / 6 * 100)),
-            "Academic load":        round(((inputs.get("study_load", 3) - 1) / 4 +
-                                           (4 - min(inputs.get("cgpa", 7.5), 4)) / 4 +
-                                           inputs.get("financial", 0) / 4) / 3 * 100),
-            "Mental health":        round(((inputs.get("anxiety", 2) - 1) +
-                                           inputs.get("depression_flag", 0) +
-                                           inputs.get("concentration", 1) +
-                                           inputs.get("panic", 0)) / 16 * 100),
-            "Social environment":   round(((inputs.get("social_isolation", 2) - 1) +
-                                           (inputs.get("peer_pressure", 2) - 1) +
-                                           (inputs.get("home_stress", 2) - 1) +
-                                           inputs.get("relationship_stress", 1)) / 14 * 100),
-            "Lifestyle":            round((inputs.get("screen_hours", 4) / 12 +
-                                           (inputs.get("exercise", 2) - 1) / 3 +
-                                           inputs.get("weight_change", 0) / 3) / 3 * 100),
+            "Sleep strain":         clamp_pct((8 - inputs.get("sleep_hours", 7)) / 6 * 100),
+            "Academic pressure":    clamp_pct(((10 - inputs.get("cgpa", 7.5)) / 10 +
+                                               (inputs.get("study_load", 3) - 1) / 4 +
+                                               (inputs.get("attendance", 2) - 1) / 3 +
+                                               inputs.get("financial", 0) / 4) / 4 * 100),
+            "Mental strain":        clamp_pct(((inputs.get("anxiety", 2) - 1) / 4 +
+                                               inputs.get("depression_flag", 0) / 4 +
+                                               inputs.get("concentration", 1) / 4 +
+                                               inputs.get("panic", 0) / 4) / 4 * 100),
+            "Social pressure":      clamp_pct(((inputs.get("social_isolation", 2) - 1) / 3 +
+                                               (inputs.get("peer_pressure", 2) - 1) / 4 +
+                                               (inputs.get("home_stress", 2) - 1) / 3 +
+                                               inputs.get("relationship_stress", 1) / 4) / 4 * 100),
+            "Lifestyle strain":     clamp_pct((inputs.get("screen_hours", 4) / 12 +
+                                               (inputs.get("exercise", 2) - 1) / 3 +
+                                               inputs.get("weight_change", 0) / 3) / 3 * 100),
         }
 
         return jsonify(result)

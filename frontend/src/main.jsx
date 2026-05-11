@@ -48,15 +48,18 @@ function StressBusterGame() {
 
     const pickedIndex = Math.floor(Math.random() * wheelActivities.length);
     const segmentAngle = 360 / wheelActivities.length;
-    const targetAngle = 360 - (pickedIndex * segmentAngle + segmentAngle / 2);
-    const nextRotation = rotation + 1440 + targetAngle;
+    const pickedCenter = pickedIndex * segmentAngle + segmentAngle / 2;
+    const currentTurn = ((rotation % 360) + 360) % 360;
+    const targetTurn = (360 - pickedCenter) % 360;
+    const landingTurn = (targetTurn - currentTurn + 360) % 360;
+    const nextRotation = rotation + 2160 + landingTurn;
 
     setSpinning(true);
     setRotation(nextRotation);
     window.setTimeout(() => {
       setSelectedActivity(wheelActivities[pickedIndex].title);
       setSpinning(false);
-    }, 1800);
+    }, 2600);
   };
 
   return (
@@ -64,28 +67,27 @@ function StressBusterGame() {
       <h3>Activity Spin Wheel</h3>
       <div className="wheel-wrap">
         <div className="wheel-pointer" />
-        <svg className="activity-wheel" viewBox="0 0 320 320" aria-label="Spinning activity wheel">
-          <g style={{ transform: `rotate(${rotation}deg)`, transformOrigin: "160px 160px" }}>
-          {wheelActivities.map((activity, index) => (
-            <g key={activity.title}>
-              <path
-                d={describeSlice(160, 160, 150, index * 36, (index + 1) * 36)}
-                fill={activity.color}
-              />
-              <text
-                className="wheel-svg-label"
-                x={polarToCartesian(160, 160, 96, index * 36 + 18).x}
-                y={polarToCartesian(160, 160, 96, index * 36 + 18).y}
-              >
-                <tspan x={polarToCartesian(160, 160, 96, index * 36 + 18).x} dy="-5">{activity.lines[0]}</tspan>
-                <tspan x={polarToCartesian(160, 160, 96, index * 36 + 18).x} dy="15">{activity.lines[1]}</tspan>
-              </text>
-            </g>
-          ))}
-          </g>
-          <circle className="wheel-inner-guide" cx="160" cy="160" r="90" />
-          <circle className="wheel-hub" cx="160" cy="160" r="44" />
-        </svg>
+        <div className="wheel-rotor" style={{ transform: `rotate(${rotation}deg)` }}>
+          <svg className="activity-wheel" viewBox="0 0 320 320" aria-label="Spinning activity wheel">
+            {wheelActivities.map((activity, index) => (
+              <g key={activity.title}>
+                <path
+                  d={describeSlice(160, 160, 150, index * 36, (index + 1) * 36)}
+                  fill={activity.color}
+                />
+                <text
+                  className="wheel-svg-label"
+                  x={polarToCartesian(160, 160, 96, index * 36 + 18).x}
+                  y={polarToCartesian(160, 160, 96, index * 36 + 18).y}
+                >
+                  <tspan x={polarToCartesian(160, 160, 96, index * 36 + 18).x} dy="-5">{activity.lines[0]}</tspan>
+                  <tspan x={polarToCartesian(160, 160, 96, index * 36 + 18).x} dy="15">{activity.lines[1]}</tspan>
+                </text>
+              </g>
+            ))}
+          </svg>
+        </div>
+        <div className="wheel-hub" aria-hidden="true" />
         <button className="wheel-center" onClick={spinWheel} disabled={spinning} type="button">
           {spinning ? "..." : "SPIN"}
         </button>

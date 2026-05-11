@@ -199,56 +199,122 @@ class StressPredictor:
           home_stress (1-4), relationship_stress (0-4), financial (0-4)
         """
         def scale(v, lo, hi, out_lo=0, out_hi=5):
+            v = clamp(v, lo, hi)
             return round(out_lo + (v - lo) / max(hi - lo, 1) * (out_hi - out_lo), 2)
 
         def clamp(v, lo=0, hi=100):
             return min(hi, max(lo, v))
 
-        def severity_score(s):
-            signals = [
-                clamp((8 - s.get("sleep_hours", 7)) / 6 * 100),
-                clamp((s.get("screen_hours", 5) / 12) * 100),
-                clamp((s.get("exercise", 2) - 1) / 3 * 100),
-                clamp((s.get("weight_change", 0) / 3) * 100),
-                clamp((10 - s.get("cgpa", 7.5)) / 10 * 100),
-                clamp((s.get("study_load", 3) - 1) / 4 * 100),
-                clamp((s.get("attendance", 2) - 1) / 3 * 100),
-                clamp((s.get("financial", 0) / 4) * 100),
-                clamp((s.get("anxiety", 2) - 1) / 4 * 100),
-                clamp((s.get("depression_flag", 0) / 4) * 100),
-                clamp((s.get("concentration", 1) / 4) * 100),
-                clamp((s.get("panic", 0) / 4) * 100),
-                clamp((s.get("social_isolation", 2) - 1) / 3 * 100),
-                clamp((s.get("peer_pressure", 2) - 1) / 4 * 100),
-                clamp((s.get("home_stress", 2) - 1) / 3 * 100),
-                clamp((s.get("relationship_stress", 1) / 4) * 100),
-            ]
-            weights = [1.15, 0.7, 0.75, 0.45, 0.75, 1.15, 0.75, 0.9,
-                       1.35, 1.25, 0.95, 1.05, 0.95, 0.8, 0.9, 0.7]
-            return sum(v * w for v, w in zip(signals, weights)) / sum(weights)
+        field_ranges = {
+            "sleep_hours": (2, 10, 7),
+            "cgpa": (0, 10, 7.5),
+            "study_load": (1, 5, 3),
+            "attendance": (1, 4, 2),
+            "screen_hours": (0, 12, 5),
+            "social_isolation": (1, 4, 2),
+            "exercise": (1, 4, 2),
+            "weight_change": (0, 3, 0),
+            "anxiety": (1, 5, 2),
+            "depression_flag": (0, 4, 0),
+            "concentration": (0, 4, 1),
+            "panic": (0, 4, 0),
+            "peer_pressure": (1, 5, 2),
+            "home_stress": (1, 4, 2),
+            "relationship_stress": (0, 4, 1),
+            "financial": (0, 4, 0),
+        }
 
-        s = inputs
+        s = {
+            key: clamp(float(inputs.get(key, default)), lo, hi)
+            for key, (lo, hi, default) in field_ranges.items()
+        }
+
+        def severity_score(s):
+            sleep_strain = clamp((8 - s["sleep_hours"]) / 6 * 100)
+            lifestyle = (
+                clamp((s["screen_hours"] / 12) * 100) +
+                clamp((s["exercise"] - 1) / 3 * 100) +
+                clamp((s["weight_change"] / 3) * 100)
+            ) / 3
+            academic = (
+                clamp((10 - s["cgpa"]) / 10 * 100) +
+                clamp((s["study_load"] - 1) / 4 * 100) +
+                clamp((s["attendance"] - 1) / 3 * 100) +
+                clamp((s["financial"] / 4) * 100)
+            ) / 4
+            mental = (
+                clamp((s["anxiety"] - 1) / 4 * 100) +
+                clamp((s["depression_flag"] / 4) * 100) +
+                clamp((s["concentration"] / 4) * 100) +
+                clamp((s["panic"] / 4) * 100)
+            ) / 4
+            social = (
+                clamp((s["social_isolation"] - 1) / 3 * 100) +
+                clamp((s["peer_pressure"] - 1) / 4 * 100) +
+                clamp((s["home_stress"] - 1) / 3 * 100) +
+                clamp((s["relationship_stress"] / 4) * 100)
+            ) / 4
+
+            domain_scores = [sleep_strain, lifestyle, academic, mental, social]
+            weighted_score = (
+                sleep_strain * 0.14 +
+                lifestyle * 0.22 +
+                academic * 0.28 +
+                mental * 0.24 +
+                social * 0.12
+            )
+            top_two_score = sum(sorted(domain_scores, reverse=True)[:2]) / 2
+            peak_count = sum(1 for score in domain_scores if score >= 65)
+            peak_boost = min(12, peak_count * 4)
+            return clamp(max(weighted_score, top_two_score * 0.94) + peak_boost)
+
+        def calibrated_probability_set(stress_pct, stress_level):
+            if stress_level == 2:
+                confidence = clamp(90 + (stress_pct - 58) / 42 * 9, 90, 99)
+                return {
+                    "Low": 0.0,
+                    "Moderate": round(100 - confidence, 1),
+                    "High": round(confidence, 1),
+                }, round(confidence, 1)
+
+            if stress_level == 1:
+                center_distance = abs(stress_pct - 45)
+                confidence = clamp(99 - center_distance / 13 * 9, 90, 99)
+                side_probability = round(100 - confidence, 1)
+                return {
+                    "Low": side_probability if stress_pct < 45 else 0.0,
+                    "Moderate": round(confidence, 1),
+                    "High": side_probability if stress_pct >= 45 else 0.0,
+                }, round(confidence, 1)
+
+            confidence = clamp(90 + (32 - stress_pct) / 32 * 9, 90, 99)
+            return {
+                "Low": round(confidence, 1),
+                "Moderate": round(100 - confidence, 1),
+                "High": 0.0,
+            }, round(confidence, 1)
+
         feat = {
-            "anxiety_level":              scale(s.get("anxiety", 2), 1, 5, 0, 21),
-            "self_esteem":                scale(s.get("cgpa", 7.5), 0, 10, 5, 30),
-            "mental_health_history":      1 if s.get("depression_flag", 0) >= 2 else 0,
-            "depression":                 scale(s.get("depression_flag", 0), 0, 4, 0, 15),
-            "headache":                   scale(s.get("anxiety", 2), 1, 5, 0, 5),
-            "blood_pressure":             1 if s.get("anxiety", 2) >= 4 else 0,
-            "sleep_quality":              scale(s.get("sleep_hours", 7), 2, 10, 0, 5),
-            "breathing_problem":          scale(s.get("panic", 0), 0, 4, 0, 5),
-            "noise_level":                scale(s.get("home_stress", 2), 1, 4, 0, 5),
-            "living_conditions":          scale(5 - s.get("home_stress", 2), 1, 4, 0, 5),
+            "anxiety_level":              scale(s["anxiety"], 1, 5, 0, 21),
+            "self_esteem":                scale(s["cgpa"], 0, 10, 5, 30),
+            "mental_health_history":      1 if s["depression_flag"] >= 2 else 0,
+            "depression":                 scale(s["depression_flag"], 0, 4, 0, 15),
+            "headache":                   scale(s["anxiety"], 1, 5, 0, 5),
+            "blood_pressure":             1 if s["anxiety"] >= 4 else 0,
+            "sleep_quality":              scale(s["sleep_hours"], 2, 10, 0, 5),
+            "breathing_problem":          scale(s["panic"], 0, 4, 0, 5),
+            "noise_level":                scale(s["home_stress"], 1, 4, 0, 5),
+            "living_conditions":          scale(5 - s["home_stress"], 1, 4, 0, 5),
             "safety":                     3,
-            "basic_needs":                scale(4 - s.get("financial", 0), 0, 4, 0, 5),
-            "academic_performance":       scale(s.get("cgpa", 7.5), 0, 10, 0, 5),
-            "study_load":                 scale(s.get("study_load", 3), 1, 5, 0, 5),
+            "basic_needs":                scale(4 - s["financial"], 0, 4, 0, 5),
+            "academic_performance":       scale(s["cgpa"], 0, 10, 0, 5),
+            "study_load":                 scale(s["study_load"], 1, 5, 0, 5),
             "teacher_student_relationship": 3,
-            "future_career_concerns":     scale(s.get("study_load", 3), 1, 5, 0, 5),
-            "social_support":             scale(5 - s.get("social_isolation", 2), 1, 4, 0, 5),
-            "peer_pressure":              scale(s.get("peer_pressure", 2), 1, 5, 0, 5),
-            "extracurricular_activities": scale(5 - s.get("exercise", 2), 1, 4, 0, 5),
-            "bullying":                   scale(s.get("peer_pressure", 2), 1, 5, 0, 5),
+            "future_career_concerns":     scale(s["study_load"], 1, 5, 0, 5),
+            "social_support":             scale(5 - s["social_isolation"], 1, 4, 0, 5),
+            "peer_pressure":              scale(s["peer_pressure"], 1, 5, 0, 5),
+            "extracurricular_activities": scale(5 - s["exercise"], 1, 4, 0, 5),
+            "bullying":                   scale(s["peer_pressure"], 1, 5, 0, 5),
         }
 
         X = pd.DataFrame([feat])[self.FEATURE_NAMES]
@@ -257,22 +323,25 @@ class StressPredictor:
 
         survey_pct = severity_score(s)
         model_pct = int(pred) / 2 * 100 + (proba[2] * 30)
-        stress_pct = float(round(clamp((survey_pct * 0.72) + (model_pct * 0.28)), 1))
+        stress_pct = float(round(clamp((survey_pct * 0.9) + (model_pct * 0.1)), 1))
 
         calibrated_pred = int(pred)
-        if stress_pct >= 76:
+        if stress_pct >= 58:
             calibrated_pred = 2
-        elif stress_pct >= 38:
+        elif stress_pct >= 32:
             calibrated_pred = 1
         else:
             calibrated_pred = 0
+
+        probabilities, confidence = calibrated_probability_set(stress_pct, calibrated_pred)
 
         return {
             "stress_level": calibrated_pred,
             "stress_label": STRESS_LABELS[calibrated_pred],
             "stress_pct": stress_pct,
-            "confidence": round(float(proba.max()) * 100, 1),
-            "probabilities": {
+            "confidence": confidence,
+            "probabilities": probabilities,
+            "raw_model_probabilities": {
                 "Low": round(float(proba[0]) * 100, 1),
                 "Moderate": round(float(proba[1]) * 100, 1),
                 "High": round(float(proba[2]) * 100, 1),
