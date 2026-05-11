@@ -155,6 +155,39 @@ const defaultInputs = fieldGroups
   .flatMap((group) => group.fields)
   .reduce((values, field) => ({ ...values, [field.name]: field.value }), {});
 
+function clampPct(value) {
+  return Math.round(Math.min(100, Math.max(0, value)));
+}
+
+function calculateFactorScores(inputs) {
+  return {
+    "Sleep strain": clampPct((8 - inputs.sleep_hours) / 6 * 100),
+    "Academic pressure": clampPct((
+      (10 - inputs.cgpa) / 10 +
+      (inputs.study_load - 1) / 4 +
+      (inputs.attendance - 1) / 3 +
+      inputs.financial / 4
+    ) / 4 * 100),
+    "Mental strain": clampPct((
+      (inputs.anxiety - 1) / 4 +
+      inputs.depression_flag / 4 +
+      inputs.concentration / 4 +
+      inputs.panic / 4
+    ) / 4 * 100),
+    "Social pressure": clampPct((
+      (inputs.social_isolation - 1) / 3 +
+      (inputs.peer_pressure - 1) / 4 +
+      (inputs.home_stress - 1) / 3 +
+      inputs.relationship_stress / 4
+    ) / 4 * 100),
+    "Lifestyle strain": clampPct((
+      inputs.screen_hours / 12 +
+      (inputs.exercise - 1) / 3 +
+      inputs.weight_change / 3
+    ) / 3 * 100)
+  };
+}
+
 function App() {
   const [inputs, setInputs] = useState(defaultInputs);
   const [result, setResult] = useState(null);
@@ -172,6 +205,14 @@ function App() {
     if (label === "moderate") return "moderate";
     return "low";
   }, [result]);
+
+  const factorScores = useMemo(() => {
+    if (result?.api_version === EXPECTED_API_VERSION && result.factors) {
+      return result.factors;
+    }
+
+    return calculateFactorScores(inputs);
+  }, [inputs, result]);
 
   function updateField(name, value) {
     setInputs((current) => ({ ...current, [name]: Number(value) }));
@@ -225,6 +266,14 @@ function App() {
 
       if (!response.ok) {
         throw new Error(data.error || "Prediction failed");
+      }
+
+      if (data.api_version !== EXPECTED_API_VERSION) {
+        setApiStatus({
+          checked: true,
+          ok: false,
+          version: data.api_version || "missing"
+        });
       }
 
       setResult(data);
@@ -324,7 +373,7 @@ function App() {
             <section>
               <h3>Factor Scores</h3>
               <div className="factor-grid">
-                {Object.entries(result.factors).map(([label, value]) => (
+                {Object.entries(factorScores).map(([label, value]) => (
                   <div className="factor" key={label}>
                     <span>{label}</span>
                     <strong>{value}%</strong>
